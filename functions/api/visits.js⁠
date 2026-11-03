@@ -1,0 +1,31 @@
+export async function onRequest(context) {
+  const { env, request } = context;
+  const kv = env.VISITS;
+  const url = new URL(request.url);
+
+  // حماية لوحة التحكم باستخدام المفتاح
+  if (url.searchParams.get("admin") === env.ADMIN_KEY) {
+    if (kv) {
+      const allVisits = await kv.list();
+      const data = {};
+      for (const key of allVisits.keys) {
+        data[key.name] = await kv.get(key.name);
+      }
+      return new Response(JSON.stringify(data, null, 2), {
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+  }
+
+  // تسجيل زيارة جديدة
+  if (kv) {
+    const today = new Date().toISOString().split('T')[0];
+    const current = parseInt((await kv.get(today)) || "0");
+    await kv.put(today, (current + 1).toString());
+    return new Response(JSON.stringify({ status: "success", count: current + 1 }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  return new Response(JSON.stringify({ status: "KV Not Bound" }), { status: 500 });
+}
